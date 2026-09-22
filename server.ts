@@ -7,7 +7,7 @@ import { createServer as createViteServer } from 'vite';
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 
@@ -357,6 +357,27 @@ async function dispatchSms(to: string, message: string): Promise<{ success: bool
 // -------------------------------------------------------------
 // 4. WhatsApp Message Generator & Dispatcher
 // -------------------------------------------------------------
+function generateDoctorWhatsAppNotification(appointment: AppointmentPayload): string {
+  return `*NEW DENTAL APPOINTMENT* 🦷
+
+*Booking ID:* ${appointment.id}
+
+👤 *Patient:* ${appointment.fullName}
+📞 *Phone:* ${appointment.phoneNumber}
+📧 *Email:* ${appointment.email}
+
+📅 *Preferred Date:* ${appointment.preferredDate}
+⏰ *Preferred Time:* ${appointment.preferredTime}
+
+🦷 *Treatment / Reason:*
+${appointment.treatmentReason}
+
+${appointment.additionalNotes ? `📝 *Notes:*\n${appointment.additionalNotes}\n` : ''}
+
+Please review this appointment in the clinic admin dashboard.
+
+*${CLINIC_INFO.clinicName}*`.trim();
+}
 function generateStaffConfirmedWhatsApp(appointment: AppointmentPayload): string {
   return `*APPOINTMENT CONFIRMED* ✅
 *${CLINIC_INFO.clinicName}*
@@ -657,7 +678,73 @@ app.post('/api/confirm-appointment-notifications', async (req: Request, res: Res
     });
   }
 });
+app.post('/api/new-appointment-notification', async (req: Request, res: Response) => {
+  try {
+    const {
+      id,
+      fullName,
+      phoneNumber,
+      email,
+      preferredDate,
+      preferredTime,
+      treatmentReason,
+      additionalNotes
+    } = req.body;
 
+    if (!id || !fullName || !phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing appointment information.'
+      });
+    }
+
+    const appointment: AppointmentPayload = {
+      id,
+      fullName,
+      phoneNumber,
+      email: email || '',
+      preferredDate: preferredDate || '',
+      preferredTime: preferredTime || '',
+      treatmentReason: treatmentReason || '',
+      additionalNotes
+    };
+
+    const doctorWhatsApp = process.env.DOCTOR_WHATSAPP_NUMBER;
+
+    if (!doctorWhatsApp) {
+      return res.status(500).json({
+        success: false,
+        error: 'DOCTOR_WHATSAPP_NUMBER is not configured.'
+      });
+    }
+
+    const message = generateDoctorWhatsAppNotification(appointment);
+
+    const result = await dispatchWhatsApp(
+      doctorWhatsApp,
+      message
+    );
+
+    return res.json({
+      success: result.success,
+      appointmentId: id,
+      whatsapp: {
+        status: result.success ? 'sent' : 'failed',
+        recipient: doctorWhatsApp,
+        messageId: result.messageId,
+        provider: result.provider
+      }
+    });
+
+  } catch (error: any) {
+    console.error('[Doctor WhatsApp] Error:', error);
+
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 // Vite middleware & Production static serving
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
