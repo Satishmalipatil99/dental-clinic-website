@@ -1,0 +1,6 @@
+{
+  "name": "Dental Clinic Website",
+  "description": "A modern, premium, and trustworthy dental clinic website designed for patient education, local SEO, and appointment bookings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
