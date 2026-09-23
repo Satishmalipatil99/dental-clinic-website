@@ -555,7 +555,7 @@ const info = {
   messageId: data?.id || 'resend-sent',
 };
 
-    console.log(`[EmailService] Request received email sent to ${email} (Ref: ${payload.id}, realSmtp: ${isRealSmtp})`);
+    console.log(`[EmailService] Request received email sent to ${email} via Resend (Ref: ${payload.id})`);
 
     return res.json({
       success: true,
@@ -565,7 +565,6 @@ const info = {
         subject,
         messageId: info.messageId || `msg_${Date.now()}`,
         sentAt: new Date().toISOString(),
-        isRealSmtp,
         htmlPreview: htmlContent,
       },
     });
@@ -623,22 +622,34 @@ app.post('/api/confirm-appointment-notifications', async (req: Request, res: Res
 
     if (payload.email && payload.email.includes('@')) {
       try {
-        const { transporter, isRealSmtp } = getEmailTransporter();
         const html = generateStaffConfirmedEmailHtml(payload);
-        const text = generateStaffConfirmedEmailText(payload);
-        const smtpFrom = process.env.SMTP_FROM || `"${CLINIC_INFO.clinicName}" <no-reply@dentalclinic.com>`;
+const text = generateStaffConfirmedEmailText(payload);
+const smtpFrom = process.env.SMTP_FROM || `"${CLINIC_INFO.clinicName}" <no-reply@dentalclinic.com>`;
 
-        const mailInfo = await transporter.sendMail({
-          from: smtpFrom,
-          to: payload.email,
-          subject: emailResult.subject,
-          text,
-          html,
-        });
+const resendApiKey = process.env.RESEND_API_KEY;
 
-        emailResult.messageId = mailInfo.messageId || emailResult.messageId;
-        emailResult.previewHtml = html;
-        console.log(`[MultiChannel] Confirmed Email sent to ${payload.email} (realSmtp: ${isRealSmtp})`);
+if (!resendApiKey) {
+  throw new Error('RESEND_API_KEY is not configured.');
+}
+
+const resend = new Resend(resendApiKey);
+
+const { data, error } = await resend.emails.send({
+  from: smtpFrom,
+  to: payload.email,
+  subject: emailResult.subject,
+  text,
+  html,
+});
+
+if (error) {
+  throw new Error(`Resend email error: ${error.message}`);
+}
+
+emailResult.messageId = data?.id || emailResult.messageId;
+emailResult.previewHtml = html;
+
+console.log(`[MultiChannel] Confirmed Email sent to ${payload.email} via Resend`);
       } catch (err: any) {
         console.error(`[MultiChannel] Error sending confirmed email:`, err);
         emailResult.status = 'failed';
