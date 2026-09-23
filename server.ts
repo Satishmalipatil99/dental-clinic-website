@@ -2,8 +2,12 @@ import express, { Request, Response } from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
+
 import dns from 'node:dns';
+
 dns.setDefaultResultOrder('ipv4first');
+
 import { createServer as createViteServer } from 'vite';
 
 dotenv.config();
@@ -527,16 +531,29 @@ app.post('/api/send-confirmation-email', async (req: Request, res: Response) => 
     const textContent = generateConfirmationEmailText(payload);
     const subject = `Appointment Confirmation Request - ${CLINIC_INFO.clinicName} (Ref: ${payload.id})`;
     const smtpFrom = process.env.SMTP_FROM || `"${CLINIC_INFO.clinicName}" <no-reply@dentalclinic.com>`;
+const resendApiKey = process.env.RESEND_API_KEY;
 
-    const { transporter, isRealSmtp } = getEmailTransporter();
+if (!resendApiKey) {
+  throw new Error('RESEND_API_KEY is not configured.');
+}
 
-    const info = await transporter.sendMail({
-      from: smtpFrom,
-      to: email,
-      subject,
-      text: textContent,
-      html: htmlContent,
-    });
+const resend = new Resend(resendApiKey);
+
+const { data, error } = await resend.emails.send({
+  from: smtpFrom,
+  to: email,
+  subject,
+  text: textContent,
+  html: htmlContent,
+});
+
+if (error) {
+  throw new Error(`Resend email error: ${error.message}`);
+}
+
+const info = {
+  messageId: data?.id || 'resend-sent',
+};
 
     console.log(`[EmailService] Request received email sent to ${email} (Ref: ${payload.id}, realSmtp: ${isRealSmtp})`);
 
