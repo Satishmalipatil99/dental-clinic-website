@@ -3,6 +3,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
+import crypto from 'node:crypto';
 
 import dns from 'node:dns';
 
@@ -502,6 +503,32 @@ function getEmailTransporter() {
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', service: 'dental-clinic-api' });
+});
+
+app.post('/api/staff/login', (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  const staffEmail = process.env.STAFF_EMAIL;
+  const staffPassword = process.env.STAFF_PASSWORD;
+
+  if (!staffEmail || !staffPassword) {
+    return res.status(500).json({
+      success: false,
+      message: 'Staff authentication is not configured.',
+    });
+  }
+
+  if (email !== staffEmail || password !== staffPassword) {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid email or password.',
+    });
+  }
+
+  return res.json({
+    success: true,
+    message: 'Login successful.',
+  });
 });
 
 // Route: Patient Initial Booking Request Confirmation Email

@@ -17,6 +17,7 @@ import { BookAppointmentPage } from './pages/BookAppointmentPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { TermsPage } from './pages/TermsPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
+import { StaffLoginPage } from './pages/StaffLoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 export default function App() {
@@ -39,7 +40,8 @@ export default function App() {
           <Route path="/book-appointment" element={<BookAppointmentPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
-          <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/admin" element={<StaffLoginPage />} />
+<Route path="/admin/dashboard" element={<AdminDashboardPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Layout>
