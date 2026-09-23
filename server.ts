@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');
 import { createServer as createViteServer } from 'vite';
 
 dotenv.config();
