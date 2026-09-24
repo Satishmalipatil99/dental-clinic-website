@@ -35,7 +35,9 @@ export interface MultiChannelDispatchResult {
 /**
  * Builds the official WhatsApp confirmation message for the patient.
  */
-export function buildWhatsAppConfirmationMessage(appointment: AppointmentRecord): string {
+export function buildWhatsAppConfirmationMessage(
+  appointment: AppointmentRecord
+): string {
   return `*APPOINTMENT CONFIRMED* ✅
 *${clinicConfig.clinicName}*
 ---------------------------------
@@ -63,7 +65,9 @@ Please arrive 10 minutes before your slot. We look forward to seeing you!`.trim(
 /**
  * Builds the official SMS confirmation message for the patient.
  */
-export function buildSmsConfirmationMessage(appointment: AppointmentRecord): string {
+export function buildSmsConfirmationMessage(
+  appointment: AppointmentRecord
+): string {
   return `CONFIRMED: Dear ${appointment.fullName}, your dental appointment at ${clinicConfig.clinicName} for ${appointment.treatmentReason} is CONFIRMED for ${appointment.preferredDate} at ${appointment.preferredTime}. Ref: ${appointment.id}. Doctor: ${clinicConfig.doctorName}. Clinic: ${clinicConfig.phoneDisplay}.`.trim();
 }
 
@@ -71,7 +75,9 @@ export function buildSmsConfirmationMessage(appointment: AppointmentRecord): str
  * Calls backend API to dispatch confirmation across Email, SMS, and WhatsApp.
  * Provides fallback simulated dispatch if backend cannot be reached.
  */
-export async function sendStaffConfirmationNotifications(appointment: AppointmentRecord): Promise<MultiChannelDispatchResult> {
+export async function sendStaffConfirmationNotifications(
+  appointment: AppointmentRecord
+): Promise<MultiChannelDispatchResult> {
   const cleanPhone = appointment.phoneNumber.replace(/[^0-9]/g, '');
   const waText = buildWhatsAppConfirmationMessage(appointment);
   const smsText = buildSmsConfirmationMessage(appointment);
@@ -99,12 +105,16 @@ export async function sendStaffConfirmationNotifications(appointment: Appointmen
       const data: MultiChannelDispatchResult = await res.json();
       return data;
     }
+
     throw new Error(`Server responded with ${res.status}`);
   } catch (err) {
-    console.warn('[NotificationService] Backend multi-channel call error, using local dispatch:', err);
-    
-    // Client-side fallback dispatch
+    console.warn(
+      '[NotificationService] Backend multi-channel call error, using local dispatch:',
+      err
+    );
+
     const now = new Date().toISOString();
+
     return {
       success: true,
       appointmentId: appointment.id,
@@ -133,6 +143,92 @@ export async function sendStaffConfirmationNotifications(appointment: Appointmen
           whatsappUrl: waUrl,
         },
       },
+    };
+  }
+}
+
+// -------------------------------------------------------------
+// Appointment Status Email
+// -------------------------------------------------------------
+
+export type AppointmentStatus = 'pending' | 'cancelled';
+
+export interface AppointmentStatusEmailResult {
+  success: boolean;
+  appointmentId: string;
+  status: AppointmentStatus;
+  email: {
+    status: 'sent' | 'failed';
+    recipient: string;
+    subject: string;
+    messageId: string;
+    sentAt: string;
+    previewHtml?: string;
+  };
+  error?: string;
+}
+
+/**
+ * Sends a pending or cancelled appointment email to the patient.
+ */
+export async function sendAppointmentStatusEmail(
+  appointment: AppointmentRecord,
+  status: AppointmentStatus
+): Promise<AppointmentStatusEmailResult> {
+  try {
+    const res = await fetch('/api/send-appointment-status-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        id: appointment.id,
+        fullName: appointment.fullName,
+        phoneNumber: appointment.phoneNumber,
+        email: appointment.email || '',
+        preferredDate: appointment.preferredDate,
+        preferredTime: appointment.preferredTime,
+        treatmentReason: appointment.treatmentReason,
+        additionalNotes: appointment.additionalNotes,
+        status,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(
+        data?.error || `Server responded with ${res.status}`
+      );
+    }
+
+    return data;
+  } catch (err) {
+    console.error(
+      '[NotificationService] Appointment status email failed:',
+      err
+    );
+
+    const now = new Date().toISOString();
+
+    return {
+      success: false,
+      appointmentId: appointment.id,
+      status,
+      email: {
+        status: 'failed',
+        recipient: appointment.email || '',
+        subject:
+          status === 'pending'
+            ? `⏳ Appointment Pending: ${clinicConfig.clinicName} (Ref: ${appointment.id})`
+            : `❌ Appointment Cancelled: ${clinicConfig.clinicName} (Ref: ${appointment.id})`,
+        messageId: '',
+        sentAt: now,
+      },
+      error:
+        err instanceof Error
+          ? err.message
+          : 'Unknown error',
     };
   }
 }

@@ -495,7 +495,194 @@ function getEmailTransporter() {
     isRealSmtp: false,
   };
 }
+// -------------------------------------------------------------
+// Appointment Status Email Generator
+// -------------------------------------------------------------
 
+function generateAppointmentStatusEmailHtml(
+  appointment: AppointmentPayload,
+  status: 'pending' | 'cancelled'
+): string {
+  const isPending = status === 'pending';
+
+  const title = isPending
+    ? 'Your Appointment is Pending'
+    : 'Your Appointment has been Cancelled';
+
+  const statusText = isPending
+    ? 'Your appointment request is currently pending review by our clinic team.'
+    : 'Your appointment has been cancelled by our clinic team.';
+
+  const statusColor = isPending ? '#d97706' : '#dc2626';
+  const statusBackground = isPending ? '#fffbeb' : '#fef2f2';
+  const statusBorder = isPending ? '#fde68a' : '#fecaca';
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title} - ${CLINIC_INFO.clinicName}</title>
+</head>
+
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9;padding:32px 16px;">
+<tr>
+<td align="center">
+
+<table role="presentation" width="100%" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+
+<tr>
+<td style="background:#0f2b48;padding:32px 28px;text-align:center;">
+  <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:800;">
+    ${CLINIC_INFO.clinicName}
+  </h1>
+
+  <p style="margin:6px 0 0;color:#94a3b8;font-size:13px;">
+    ${CLINIC_INFO.tagline}
+  </p>
+</td>
+</tr>
+
+<tr>
+<td style="height:6px;background:${statusColor};"></td>
+</tr>
+
+<tr>
+<td style="padding:36px 30px;">
+
+<div style="text-align:center;margin-bottom:20px;">
+  <span style="
+    display:inline-block;
+    background:${statusBackground};
+    color:${statusColor};
+    font-weight:800;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    padding:7px 16px;
+    border-radius:9999px;
+    border:1px solid ${statusBorder};
+  ">
+    Status: ${isPending ? 'Pending' : 'Cancelled'}
+  </span>
+</div>
+
+<h2 style="margin:0 0 14px;color:#0f2b48;font-size:22px;font-weight:800;text-align:center;">
+  ${title}
+</h2>
+
+<p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#334155;">
+  Dear <strong>${appointment.fullName}</strong>,
+</p>
+
+<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#334155;">
+  ${statusText}
+</p>
+
+<table role="presentation" width="100%" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:14px;margin-bottom:24px;">
+<tr>
+<td style="padding:20px;">
+
+<p style="margin:6px 0;font-size:14px;">
+  <strong>Booking Reference:</strong> ${appointment.id}
+</p>
+
+<p style="margin:6px 0;font-size:14px;">
+  <strong>Treatment:</strong> ${appointment.treatmentReason}
+</p>
+
+<p style="margin:6px 0;font-size:14px;">
+  <strong>Date:</strong> ${appointment.preferredDate}
+</p>
+
+<p style="margin:6px 0;font-size:14px;">
+  <strong>Time:</strong> ${appointment.preferredTime}
+</p>
+
+</td>
+</tr>
+</table>
+
+${
+  isPending
+    ? `
+<p style="font-size:14px;line-height:1.6;color:#475569;text-align:center;">
+  Our clinic team will review your request and contact you once the appointment is confirmed.
+</p>
+`
+    : `
+<p style="font-size:14px;line-height:1.6;color:#475569;text-align:center;">
+  If you would like to book another appointment, please contact our clinic.
+</p>
+`
+}
+
+<p style="margin:24px 0 0;text-align:center;font-size:13px;color:#64748b;">
+  Questions? Call <strong>${CLINIC_INFO.phoneDisplay}</strong>
+</p>
+
+</td>
+</tr>
+
+<tr>
+<td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px;text-align:center;">
+  <p style="margin:0;font-size:12px;color:#64748b;">
+    ${CLINIC_INFO.clinicName} • ${CLINIC_INFO.doctorName}
+  </p>
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>
+`;
+}
+
+function generateAppointmentStatusEmailText(
+  appointment: AppointmentPayload,
+  status: 'pending' | 'cancelled'
+): string {
+  const isPending = status === 'pending';
+
+  return `
+${isPending ? 'APPOINTMENT PENDING' : 'APPOINTMENT CANCELLED'} - ${CLINIC_INFO.clinicName}
+
+Dear ${appointment.fullName},
+
+${
+  isPending
+    ? 'Your appointment request is currently pending review by our clinic team.'
+    : 'Your appointment has been cancelled by our clinic team.'
+}
+
+Booking Reference: ${appointment.id}
+Treatment: ${appointment.treatmentReason}
+Date: ${appointment.preferredDate}
+Time: ${appointment.preferredTime}
+
+${
+  isPending
+    ? 'Our clinic team will review your request and contact you once the appointment is confirmed.'
+    : 'If you would like to book another appointment, please contact our clinic.'
+}
+
+Questions? Call ${CLINIC_INFO.phoneDisplay}
+
+${CLINIC_INFO.clinicName} Team
+`.trim();
+}
+
+// -------------------------------------------------------------
+// 6. Routes
+// -------------------------------------------------------------
 // -------------------------------------------------------------
 // 6. Routes
 // -------------------------------------------------------------
@@ -739,6 +926,111 @@ console.log(`[MultiChannel] Confirmed Email sent to ${payload.email} via Resend`
     });
   }
 });
+
+// Route: Send Patient Appointment Status Email
+app.post('/api/send-appointment-status-email', async (req: Request, res: Response) => {
+  try {
+    const {
+      id,
+      fullName,
+      phoneNumber,
+      email,
+      preferredDate,
+      preferredTime,
+      treatmentReason,
+      additionalNotes,
+      status,
+    } = req.body;
+
+    if (!id || !fullName || !email || !status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required appointment status email parameters.',
+      });
+    }
+
+    if (status !== 'pending' && status !== 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid appointment status.',
+      });
+    }
+
+    const payload: AppointmentPayload = {
+      id,
+      fullName,
+      phoneNumber: phoneNumber || CLINIC_INFO.phoneDisplay,
+      email,
+      preferredDate: preferredDate || 'Upcoming',
+      preferredTime: preferredTime || 'Available Slot',
+      treatmentReason: treatmentReason || 'Dental Consultation',
+      additionalNotes,
+    };
+
+    const htmlContent = generateAppointmentStatusEmailHtml(payload, status);
+    const textContent = generateAppointmentStatusEmailText(payload, status);
+
+    const subject =
+      status === 'pending'
+        ? `⏳ Appointment Pending: ${CLINIC_INFO.clinicName} (Ref: ${id})`
+        : `❌ Appointment Cancelled: ${CLINIC_INFO.clinicName} (Ref: ${id})`;
+
+    const smtpFrom =
+      process.env.SMTP_FROM ||
+      `"${CLINIC_INFO.clinicName}" <no-reply@dentalclinic.com>`;
+
+    const resendApiKey = process.env.RESEND_API_KEY;
+
+    if (!resendApiKey) {
+      throw new Error('RESEND_API_KEY is not configured.');
+    }
+
+    const resend = new Resend(resendApiKey);
+
+    const { data, error } = await resend.emails.send({
+      from: smtpFrom,
+      to: email,
+      subject,
+      text: textContent,
+      html: htmlContent,
+    });
+
+    if (error) {
+      throw new Error(`Resend email error: ${error.message}`);
+    }
+
+    console.log(
+      `[StatusEmail] ${status} email sent to ${email} via Resend (Ref: ${id})`
+    );
+
+    return res.json({
+      success: true,
+      appointmentId: id,
+      status,
+      email: {
+        status: 'sent',
+        recipient: email,
+        subject,
+        messageId: data?.id || `email_${Date.now()}`,
+        sentAt: new Date().toISOString(),
+        previewHtml: htmlContent,
+      },
+    });
+  } catch (error: any) {
+    console.error(
+      '[StatusEmail] Error in /api/send-appointment-status-email:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to send appointment status email.',
+      details: error.message,
+    });
+  }
+});
+
+
 app.post('/api/new-appointment-notification', async (req: Request, res: Response) => {
   try {
     const {

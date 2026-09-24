@@ -23,11 +23,11 @@ import { getStoredAppointments, updateAppointmentStatus, clearAllAppointments } 
 import { AppointmentRecord } from '../types';
 import { clinicConfig, getWhatsAppUrl } from '../config/clinic';
 import { 
-  sendStaffConfirmationNotifications, 
+  sendStaffConfirmationNotifications,
+  sendAppointmentStatusEmail,
   MultiChannelDispatchResult, 
-  buildWhatsAppConfirmationMessage 
+  buildWhatsAppConfirmationMessage
 } from '../utils/notificationService';
-
 export const AdminDashboardPage: React.FC = () => {
   const [records, setRecords] = useState<AppointmentRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,11 +50,33 @@ export const AdminDashboardPage: React.FC = () => {
     loadData();
   }, []);
 
-  const handleStatusChange = (id: string, status: 'pending' | 'confirmed' | 'cancelled') => {
-    updateAppointmentStatus(id, status);
-    loadData();
-  };
+  const handleStatusChange = async (
+  record: AppointmentRecord,
+  status: 'pending' | 'confirmed' | 'cancelled'
+) => {
+  // Send an email when the appointment becomes pending or cancelled
+  if (status === 'pending' || status === 'cancelled') {
+    try {
+      const result = await sendAppointmentStatusEmail(record, status);
 
+      if (!result.success) {
+        console.error(
+          `Failed to send ${status} appointment email:`,
+          result.error
+        );
+      }
+    } catch (error) {
+      console.error(
+        `Failed to send ${status} appointment email:`,
+        error
+      );
+    }
+  }
+
+  // Update the appointment status
+  updateAppointmentStatus(record.id, status);
+  loadData();
+};
   const handleConfirmAppointment = async (record: AppointmentRecord) => {
     setProcessingConfirmId(record.id);
     try {
@@ -482,15 +504,15 @@ export const AdminDashboardPage: React.FC = () => {
                           </button>
                         )}
                         {r.status !== 'cancelled' && (
-                          <button
-                            type="button"
-                            onClick={() => handleStatusChange(r.id, 'cancelled')}
-                            title="Mark Cancelled"
-                            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        )}
+  <button
+    type="button"
+    onClick={() => handleStatusChange(r, 'cancelled')}
+    title="Mark Cancelled"
+    className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
+  >
+    <XCircle className="w-4 h-4" />
+  </button>
+)}
                         <a
                           href={getWhatsAppUrl(buildWhatsAppConfirmationMessage(r), r.phoneNumber)}
                           target="_blank"
